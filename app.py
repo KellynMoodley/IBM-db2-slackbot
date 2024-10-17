@@ -109,7 +109,13 @@ sample_events=[
         "enddate":"2022-10-26",
         "contact": "https://www.idug.org"
     },
-
+    {
+        "shortname":"Hello 2022",
+        "location": "Edinburgh, Scotland",
+        "begindate":"2022-10-22",
+        "enddate":"2022-10-26",
+        "contact": "https://www.idug.org"
+    },
 ]
 
 
