@@ -93,68 +93,44 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# sample records to be inserted after table recreation
-sample_events=[
-    {
-        "shortname":"Think 2022",
-        "location": "Boston, US",
-        "begindate":"2022-05-10",
-        "enddate":"2022-05-11",
-        "contact": "https://www.ibm.com/events/think/"
-    },
-    {
-        "shortname":"IDUG EMEA 2022",
-        "location": "Edinburgh, Scotland",
-        "begindate":"2022-10-22",
-        "enddate":"2022-10-26",
-        "contact": "https://www.idug.org"
-    },
-{
-        "shortname":"Hello 2022",
-        "location": "Edinburgh, Scotland",
-        "begindate":"2022-10-22",
-        "enddate":"2022-10-26",
-        "contact": "https://www.idug.org"
-    },
-]
-
-
-# Schema for table "EVENTS"
-# Set default schema to "EVENTS"
-class EventModel(db.Model):
-    __tablename__ = 'EVENTS'
+# Schema for table "CERTIFICATIONS"
+# Set default schema to "CERTIFICATIONS"
+class CertModel(db.Model):
+    __tablename__ = 'CERTIFICATIONS'
     __table_args__ = TABLE_ARGS
-    eid = db.Column('EID',db.Integer, primary_key=True)
-    shortname = db.Column('SHORTNAME',db.String(20))
-    location= db.Column('LOCATION',db.String(60))
-    begindate = db.Column('BEGINDATE', db.Date)
-    enddate = db.Column('ENDDATE', db.Date)
-    contact = db.Column('CONTACT',db.String(255))
+    id = db.Column('ID',db.Integer, primary_key=True)
+    employeename = db.Column('EMPLOYEENAME',db.String(32))
+    certificatetype = db.Column('CERTIFICATETYPE',db.String(32))
+    certificatedescription = db.Column('CERTIFICATEDESCRIPTION',db.String(50))
+    certificatelink = db.Column('CERTIFICATELINK',db.String(1000))
+    expirydate = db.Column('EXPIRYDATE',db.Date)
+    
+    
 
-# the Python output for Events
-class EventOutSchema(Schema):
-    eid = Integer()
-    shortname = String()
-    location = String()
-    begindate = Date()
-    enddate = Date()
-    contact = String()
+# the Python output for Certifications
+class CertOutSchema(Schema):
+    employeename = String()
+    certificatetype = String()
+    certificatedescription = String()
+    certificatelink =String()
+    expirydate = Date()
+   
 
-# the Python input for Events
-class EventInSchema(Schema):
-    shortname = String(required=True, validate=Length(0, 20))
-    location = String(required=True, validate=Length(0, 60))
-    begindate = Date(required=True)
-    enddate = Date(required=True)
-    contact = String(required=True, validate=Length(0, 255))
-
+# the Python input for Certifications
+class CertInSchema(Schema):
+    employeename = String(required=True)
+    certificatetype = String(required=True)
+    certificatedescription = String(required=True)
+    certificatelink =String(required=True)
+    expirydate = Date(required=False)
+    
 # use with pagination
-class EventQuerySchema(Schema):
+class CertQuerySchema(Schema):
     page = Integer(load_default=1)
-    per_page = Integer(load_default=20, validate=Range(max=30))
+    per_page = Integer(load_default=20, validate=Range(max=300))
 
-class EventsOutSchema(Schema):
-    events = List(Nested(EventOutSchema))
+class CerttsOutSchema(Schema):
+    certs = List(Nested(CertOutSchema))
     pagination = Nested(PaginationSchema)
 
 # register a callback to verify the token
@@ -165,74 +141,216 @@ def verify_token(token):
     else:
         return None
 
-# retrieve a single event record by EID
-@app.get('/events/eid/<int:eid>')
-@app.output(EventOutSchema)
-@app.auth_required(auth)
-def get_event_eid(eid):
-    """Event record by EID
-    Retrieve a single event record by its EID
-    """
-    return EventModel.query.get_or_404(eid)
 
-# retrieve a single event record by name
-@app.get('/events/name/<string:short_name>')
-@app.output(EventOutSchema)
+#get records by validity date
+@app.get('/certifications/valid')
+@app.output(CertOutSchema)
 @app.auth_required(auth)
-def get_event_name(short_name):
-    """Event record by name
-    Retrieve a single event record by its short name
+@app.input(CertQuerySchema, 'query')
+def get_valid_certs(query):
+    """Get valid certifications
+    Retrieve all certification records that have not expired (expiry date is after the current date)
     """
-    search="%{}%".format(short_name)
-    return EventModel.query.filter(EventModel.shortname.like(search)).first()
-
-
-# get all events
-@app.get('/events')
-@app.input(EventQuerySchema, 'query')
-#@app.input(EventInSchema(partial=True), location='query')
-@app.output(EventsOutSchema)
-@app.auth_required(auth)
-def get_events(query):
-    """all events
-    Retrieve all event records
-    """
-    pagination = EventModel.query.paginate(
+    current_date = datetime.now().date()
+    
+    pagination = CertModel.query.filter(
+        CertModel.expirydate > current_date
+    ).paginate(
         page=query['page'],
         per_page=query['per_page']
     )
-    return {
-        'events': pagination.items,
+    
+    certs_data = {
+        'certs': pagination.items,
         'pagination': pagination_builder(pagination)
     }
 
-# create an event record
-@app.post('/events')
-@app.input(EventInSchema, location='json')
-@app.output(EventOutSchema, 201)
+    # Start building the HTML table
+    table_html = "<table border='1'><tr><th>Name</th><th>CertificateType</th><th>CertificateDescription</th><th>CertificateLink</th><th>ExpirationDate</th></tr>"
+
+    # Add each valid certification to the table
+    for cert in certs_data['certs']:
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(str(cert.expirydate))}</td></tr>"
+
+    # Close the table
+    table_html += "</table>"
+
+    # Store the table in a variable
+    valid_certs_table = table_html
+
+    # Return the table as part of a JSON response
+    return jsonify({
+        "table": valid_certs_table,
+        "pagination": certs_data['pagination'],
+        "message": "Valid certification data retrieved successfully"
+    })
+
+#retrieve records with same name 
+@app.get('/certifications/name/<string:employeename>')
+@app.output(CertOutSchema)
 @app.auth_required(auth)
-def create_event(data):
-    """Insert a new event record
-    Insert a new event record with the given attributes. Its new EID is returned.
+@app.input(CertQuerySchema, 'query')
+def get_certs_by_name(employeename, query):
+    """Get certifications by name
+    Retrieve all certification records with the specified employee name
     """
-    event = EventModel(**data)
-    db.session.add(event)
-    db.session.commit()
-    return event
+    pagination = CertModel.query.filter(CertModel.employeename == employeename).paginate(
+        page=query['page'],
+        per_page=query['per_page']
+    )
+    def get_page_url(page):
+        return url_for('get_certs_by_name', employeename=employeename, page=page, per_page=query['per_page'], _external=True)
+
+    pagination_info = {
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'pages': pagination.pages,
+        'total': pagination.total,
+        'current': get_page_url(pagination.page),
+        'first': get_page_url(1),
+        'last': get_page_url(pagination.pages),
+        'prev': get_page_url(pagination.prev_num) if pagination.has_prev else None,
+        'next': get_page_url(pagination.next_num) if pagination.has_next else None
+    }
+    certs_data = {
+        'certs': pagination.items,
+        'pagination': pagination_info
+    }
+
+    # Start building the HTML table
+    table_html = "<table border='1'><tr><th>Name</th><th>CertificateType</th><th>CertificateDescription</th><th>CertificateLink</th><th>ExpirationDate</th></tr>"
+    
+    # Add each certification to the table
+    for cert in certs_data['certs']:
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(str(cert.expirydate))}</td></tr>"
+    
+    # Close the table
+    table_html += "</table>"
+    
+    # Store the table in a variable
+    Certs_table = table_html
+    
+    # Return the table as part of a JSON response
+    return jsonify({
+        "table": Certs_table,
+        "pagination": certs_data['pagination'],
+        "message": "Certification data retrieved successfully"
+    })
+
+#retrieve records with a keyword
+@app.get('/certifications/keyword/<string:tkeyword>')
+@app.output(CertOutSchema)
+@app.auth_required(auth)
+@app.input(CertQuerySchema, 'query')
+
+def get_certs_by_keyword(tkeyword, query):
+    """Get CERTS by KEYWORD
+    Retrieve all records with the specified KEYWORD
+    """
+    pagination = CertModel.query.filter(
+        (CertModel.certificatedescription.ilike(f'%{tkeyword}%')) |
+        (CertModel.certificatetype.ilike(f'%{tkeyword}%'))
+    ).paginate(
+        page=query['page'],
+        per_page=query['per_page']
+    )
+    
+    certs_data = {
+        'certs': pagination.items,
+        'pagination': pagination_builder(pagination)
+    }
+
+    # Start building the HTML table
+    table_html = "<table border='1'><tr><th>Name</th><th>CertificateType</th><th>CertificateDescription</th><th>CertificateLink</th><th>ExpirationDate</th></tr>"
+
+    # Add each matching certification to the table
+    for cert in certs_data['certs']:
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(cert.expirydate)}</td></tr>"
+
+    # Close the table
+    table_html += "</table>"
+
+    # Store the table in a variable
+    Certs_table = table_html
+
+    # Return the table as part of a JSON response
+    return jsonify({
+        "table": Certs_table,
+        "pagination": certs_data['pagination'],
+        "message": "Certification data retrieved successfully by keyword"
+    })
 
 
-# delete an event record
-@app.delete('/events/eid/<int:eid>')
-@app.output({}, 204)
+#retrieve records with same certificate type 
+@app.get('/certifications/certtype/<string:certificatetype>')
+@app.output(CertOutSchema)
 @app.auth_required(auth)
-def delete_event(eid):
-    """Delete an event record by EID
-    Delete a single event record identified by its EID.
+@app.input(CertQuerySchema, 'query')
+
+def get_certs_by_certtype(tcerttype, query):
+    """Get Certifications by type
+    Retrieve all records with the specified type
     """
-    event = EventModel.query.get_or_404(eid)
-    db.session.delete(event)
+    pagination = CertModel.query.filter(CertModel.certificatetype == tcerttype).paginate(
+        page=query['page'],
+        per_page=query['per_page']
+    )
+
+    
+    def get_page_url(page):
+        return url_for('get_certs_by_certtype', tcerttype=tcerttype, page=page, per_page=query['per_page'], _external=True)
+
+    pagination_info = {
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'pages': pagination.pages,
+        'total': pagination.total,
+        'current': get_page_url(pagination.page),
+        'first': get_page_url(1),
+        'last': get_page_url(pagination.pages),
+        'prev': get_page_url(pagination.prev_num) if pagination.has_prev else None,
+        'next': get_page_url(pagination.next_num) if pagination.has_next else None
+    }
+    certs_data = {
+        'certs': pagination.items,
+        'pagination': pagination_info
+    }
+
+    # Start building the HTML table
+    table_html = "<table border='1'><tr><th>Name</th><th>CertificateType</th><th>CertificateDescription</th><th>CertificateLink</th><th>ExpirationDate</th></tr>"
+    
+    # Add each patient to the table
+    for cert in certs_data['certs']:
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(cert.expirydate)}</td></tr>"
+    
+    # Close the table
+    table_html += "</table>"
+    
+    # Store the table in a variable
+    Certs_table = table_html
+    
+    # Return the table as part of a JSON response
+    return jsonify({
+        "table": Certs_table,
+        "pagination": certs_data['pagination'],
+        "message": "Certification data retrieved successfully"
+    })
+
+
+# create a record
+@app.post('/Certifications')
+@app.input(CertInSchema, location='json')
+@app.output(CertOutSchema, 201)
+@app.auth_required(auth)
+def create_record(data):
+    """Insert a new record
+    Insert a new record with the given attributes. Its new ID is returned.
+    """
+    cert = CertModel(**data)
+    db.session.add(cert)
     db.session.commit()
-    return ''
+    return cert
+
 
 # (re-)create the event table with sample records
 @app.post('/database/recreate')
@@ -247,9 +365,9 @@ def create_database(query):
     if query['confirmation'] is True:
         db.drop_all()
         db.create_all()
-        for e in sample_events:
-            event = EventModel(**e)
-            db.session.add(event)
+        for e in sample_certs:
+            cert = CertModel(**e)
+            db.session.add(cert)
         db.session.commit()
     else:
         abort(400, message='confirmation is missing',
@@ -265,14 +383,11 @@ def print_default():
     health check
     """
     # returning a dict equals to use jsonify()
-    return {'message': 'This is the Events API server'}
+    return {'message': 'This is the certifications API server'}
 
 
 # Start the actual app
 # Get the PORT from environment or use the default
-port = os.getenv('PORT', '5000')
-if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=int(port))
 port = os.getenv('PORT', '5000')
 if __name__ == "__main__":
     app.run(host='0.0.0.0',port=int(port))
