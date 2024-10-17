@@ -181,24 +181,56 @@ def get_event_name(short_name):
     return EventModel.query.filter(EventModel.shortname.like(search)).first()
 
 
-# get all events
+# get all events and display in table format
 @app.get('/events')
 @app.input(EventQuerySchema, 'query')
-#@app.input(EventInSchema(partial=True), location='query')
-@app.output(EventsOutSchema)
 @app.auth_required(auth)
 def get_events(query):
-    """all events
-    Retrieve all event records
+    """All events in table format
+    Retrieve all event records and display them in an HTML table
     """
     pagination = EventModel.query.paginate(
         page=query['page'],
         per_page=query['per_page']
     )
-    return {
-        'events': pagination.items,
-        'pagination': pagination_builder(pagination)
-    }
+    
+    # HTML template for the table
+    table_template = """
+    <html>
+        <head><title>Events Table</title></head>
+        <body>
+            <h1>Event Records</h1>
+            <table border="1" cellpadding="10">
+                <thead>
+                    <tr>
+                        <th>EID</th>
+                        <th>Short Name</th>
+                        <th>Location</th>
+                        <th>Begin Date</th>
+                        <th>End Date</th>
+                        <th>Contact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for event in events %}
+                    <tr>
+                        <td>{{ event.eid }}</td>
+                        <td>{{ event.shortname }}</td>
+                        <td>{{ event.location }}</td>
+                        <td>{{ event.begindate }}</td>
+                        <td>{{ event.enddate }}</td>
+                        <td><a href="{{ event.contact }}">{{ event.contact }}</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </body>
+    </html>
+    """
+    
+    # Render the HTML table with the event data
+    return render_template_string(table_template, events=pagination.items)
+
 
 # create an event record
 @app.post('/events')
