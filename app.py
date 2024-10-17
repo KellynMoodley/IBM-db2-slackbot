@@ -109,7 +109,7 @@ sample_events=[
         "enddate":"2022-10-26",
         "contact": "https://www.idug.org"
     },
-    {
+{
         "shortname":"Hello 2022",
         "location": "Edinburgh, Scotland",
         "begindate":"2022-10-22",
@@ -187,56 +187,24 @@ def get_event_name(short_name):
     return EventModel.query.filter(EventModel.shortname.like(search)).first()
 
 
-# get all events and display in table format
+# get all events
 @app.get('/events')
 @app.input(EventQuerySchema, 'query')
+#@app.input(EventInSchema(partial=True), location='query')
+@app.output(EventsOutSchema)
 @app.auth_required(auth)
 def get_events(query):
-    """All events in table format
-    Retrieve all event records and display them in an HTML table
+    """all events
+    Retrieve all event records
     """
     pagination = EventModel.query.paginate(
         page=query['page'],
         per_page=query['per_page']
     )
-    
-    # HTML template for the table
-    table_template = """
-    <html>
-        <head><title>Events Table</title></head>
-        <body>
-            <h1>Event Records</h1>
-            <table border="1" cellpadding="10">
-                <thead>
-                    <tr>
-                        <th>EID</th>
-                        <th>Short Name</th>
-                        <th>Location</th>
-                        <th>Begin Date</th>
-                        <th>End Date</th>
-                        <th>Contact</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for event in events %}
-                    <tr>
-                        <td>{{ event.eid }}</td>
-                        <td>{{ event.shortname }}</td>
-                        <td>{{ event.location }}</td>
-                        <td>{{ event.begindate }}</td>
-                        <td>{{ event.enddate }}</td>
-                        <td><a href="{{ event.contact }}">{{ event.contact }}</a></td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </body>
-    </html>
-    """
-    
-    # Render the HTML table with the event data
-    return render_template_string(table_template, events=pagination.items)
-
+    return {
+        'events': pagination.items,
+        'pagination': pagination_builder(pagination)
+    }
 
 # create an event record
 @app.post('/events')
@@ -302,6 +270,9 @@ def print_default():
 
 # Start the actual app
 # Get the PORT from environment or use the default
+port = os.getenv('PORT', '5000')
+if __name__ == "__main__":
+    app.run(host='0.0.0.0',port=int(port))
 port = os.getenv('PORT', '5000')
 if __name__ == "__main__":
     app.run(host='0.0.0.0',port=int(port))
