@@ -92,6 +92,20 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize SQLAlchemy for our database
 db = SQLAlchemy(app)
 
+# sample records to be inserted after table recreation
+sample_certs=[
+    {
+        "employeename":"Patrick Dlamini",
+        "certificatetype":"Microsoft",
+        "certificatedescription":"Azure fundamentals: AZ-900",
+        "certificatelink": "https://learn.microsoft.com/en-us/credentials/certifications/azure-fundamentals/?practice-assessment-type=certification",
+        "expirydate":"2024-05-30",
+        
+    },
+  
+
+]
+
 
 # Schema for table "CERTIFICATIONS"
 # Set default schema to "CERTIFICATIONS"
@@ -99,11 +113,11 @@ class CertModel(db.Model):
     __tablename__ = 'CERTIFICATIONS'
     __table_args__ = TABLE_ARGS
     id = db.Column('ID',db.Integer, primary_key=True)
-    employeename = db.Column('EMPLOYEENAME',db.String(32))
-    certificatetype = db.Column('CERTIFICATETYPE',db.String(32))
-    certificatedescription = db.Column('CERTIFICATEDESCRIPTION',db.String(50))
+    employeename = db.Column('EMPLOYEENAME',db.String(40))
+    certificatetype = db.Column('CERTIFICATETYPE',db.String(40))
+    certificatedescription = db.Column('CERTIFICATEDESCRIPTION',db.String(100))
     certificatelink = db.Column('CERTIFICATELINK',db.String(1000))
-    expirydate = db.Column('EXPIRYDATE',db.Date)
+    expirydate = db.Column('EXPIRYDATE',db.String(20))
     
     
 
@@ -113,7 +127,7 @@ class CertOutSchema(Schema):
     certificatetype = String()
     certificatedescription = String()
     certificatelink =String()
-    expirydate = Date()
+    expirydate = String()
    
 
 # the Python input for Certifications
@@ -122,7 +136,7 @@ class CertInSchema(Schema):
     certificatetype = String(required=True)
     certificatedescription = String(required=True)
     certificatelink =String(required=True)
-    expirydate = Date(required=False)
+    expirydate = String(required=False)
     
 # use with pagination
 class CertQuerySchema(Schema):
@@ -170,7 +184,7 @@ def get_valid_certs(query):
 
     # Add each valid certification to the table
     for cert in certs_data['certs']:
-        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(str(cert.expirydate))}</td></tr>"
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(cert.expirydate)}</td></tr>"
 
     # Close the table
     table_html += "</table>"
@@ -222,7 +236,7 @@ def get_certs_by_name(employeename, query):
     
     # Add each certification to the table
     for cert in certs_data['certs']:
-        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(str(cert.expirydate))}</td></tr>"
+        table_html += f"<tr><td>{html.escape(cert.employeename)}</td><td>{html.escape(cert.certificatetype)}</td><td>{html.escape(cert.certificatedescription)}</td><td>{html.escape(cert.certificatelink)}</td><td>{html.escape(cert.expirydate)}</td></tr>"
     
     # Close the table
     table_html += "</table>"
